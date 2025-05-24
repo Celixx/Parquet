@@ -14,7 +14,7 @@ TEMP_BUCKET = 'gs://your-bucket/temp'
 
 SCHEMA = {
     'fields': [
-        {'name': 'VendorID', 'type': 'INTEGER', 'mode': 'NULLABLE'},
+        {'name': 'VendorID', 'type': 'STRING', 'mode': 'NULLABLE'},
         {'name': 'tpep_pickup_datetime', 'type': 'TIMESTAMP', 'mode': 'NULLABLE'},
         {'name': 'tpep_dropoff_datetime', 'type': 'TIMESTAMP', 'mode': 'NULLABLE'},
         {'name': 'passenger_count', 'type': 'FLOAT', 'mode': 'NULLABLE'},
@@ -56,6 +56,22 @@ class FiltrarFilas(beam.DoFn):
                 return
         yield row
 
+class MapearVendorID(beam.DoFn):
+    VENDOR_MAP = {
+        1: "Creative Mobile Technologies, LLC",
+        2: "Curb Mobility, LLC",
+        6: "Myle Technologies Inc",
+        7: "Helix"
+    }
+
+    def process(self, row):
+        vendor_id = row.get('VendorID')
+        if vendor_id in self.VENDOR_MAP:
+            row['VendorID'] = self.VENDOR_MAP[vendor_id]
+        else:
+            row['VendorID'] = 'Unknown'
+        yield row
+
 def run():
     options = PipelineOptions([
         f'--runner=DataflowRunner',
@@ -73,10 +89,11 @@ def run():
     with beam.Pipeline(options=options) as p:
         (
             p
-            | 'Create GCS file path' >> beam.Create([PARQUET])
-            | 'Read Parquet' >> beam.ParDo(LeerParquet())
-            | 'Filter Invalid Rows' >> beam.ParDo(FiltrarFilas())
-            | 'Write to BigQuery' >> WriteToBigQuery(
+            | 'Leer ruta de GCS' >> beam.Create([PARQUET])
+            | 'Leer Parquet desde GCS' >> beam.ParDo(LeerParquet())
+            | 'Filtrar filas inválidas' >> beam.ParDo(FiltrarFilas())
+            | 'Transformar VendorID a texto' >> beam.ParDo(MapearVendorID())
+            | 'Cargar a BigQuery' >> WriteToBigQuery(
                 table=TABLA_BIGQUERY,
                 schema=SCHEMA,
                 write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
