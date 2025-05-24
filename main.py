@@ -8,7 +8,7 @@ from apache_beam.io.filesystems import FileSystems
 GCS_FILE_PATH = 'gs://your-bucket/path/to/nyc_yellow_taxi.parquet'
 BQ_TABLE = 'your-project-id:lake_parquet.nyc_yellow_taxi_cleaned'
 PROJECT_ID = 'your-project-id'
-REGION = 'your-region'
+REGION = 'us-central1'
 STAGING_BUCKET = 'gs://your-bucket/staging'
 TEMP_BUCKET = 'gs://your-bucket/temp'
 
