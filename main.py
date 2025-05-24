@@ -5,14 +5,14 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 from apache_beam.io.filesystems import FileSystems
 
-GCS_FILE_PATH = 'gs://your-bucket/path/to/nyc_yellow_taxi.parquet'
-BQ_TABLE = 'your-project-id:lake_parquet.nyc_yellow_taxi_cleaned'
+PARQUET = 'gs://your-bucket/path/to/nyc_yellow_taxi.parquet'
+TABLA_BIGQUERY = 'your-project-id:lake_parquet.nyc_yellow_taxi_cleaned'
 PROJECT_ID = 'your-project-id'
 REGION = 'us-central1'
 STAGING_BUCKET = 'gs://your-bucket/staging'
 TEMP_BUCKET = 'gs://your-bucket/temp'
 
-BQ_SCHEMA = {
+SCHEMA = {
     'fields': [
         {'name': 'VendorID', 'type': 'INTEGER', 'mode': 'NULLABLE'},
         {'name': 'tpep_pickup_datetime', 'type': 'TIMESTAMP', 'mode': 'NULLABLE'},
@@ -36,7 +36,7 @@ BQ_SCHEMA = {
     ]
 }
 
-class ReadParquetFromGCS(beam.DoFn):
+class LeerParquet(beam.DoFn):
     def process(self, element):
         with FileSystems().open(element) as f:
             parquet_file = pq.ParquetFile(f)
@@ -45,7 +45,7 @@ class ReadParquetFromGCS(beam.DoFn):
                 for row in table.to_pylist():
                     yield row
 
-class FilterInvalidRows(beam.DoFn):
+class FiltrarFilas(beam.DoFn):
     def process(self, row):
         if any(value is None for value in row.values()):
             return
@@ -73,12 +73,12 @@ def run():
     with beam.Pipeline(options=options) as p:
         (
             p
-            | 'Create GCS file path' >> beam.Create([GCS_FILE_PATH])
-            | 'Read Parquet' >> beam.ParDo(ReadParquetFromGCS())
-            | 'Filter Invalid Rows' >> beam.ParDo(FilterInvalidRows())
+            | 'Create GCS file path' >> beam.Create([PARQUET])
+            | 'Read Parquet' >> beam.ParDo(LeerParquet())
+            | 'Filter Invalid Rows' >> beam.ParDo(FiltrarFilas())
             | 'Write to BigQuery' >> WriteToBigQuery(
-                table=BQ_TABLE,
-                schema=BQ_SCHEMA,
+                table=TABLA_BIGQUERY,
+                schema=SCHEMA,
                 write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
                 custom_gcs_temp_location=TEMP_BUCKET
