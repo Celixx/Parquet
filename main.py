@@ -1,19 +1,17 @@
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions, GoogleCloudOptions, SetupOptions
+from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions
 from apache_beam.io.gcp.bigquery import WriteToBigQuery
 import pyarrow.parquet as pq
 import pyarrow as pa
 from apache_beam.io.filesystems import FileSystems
 
-# Constants
 GCS_FILE_PATH = 'gs://your-bucket/path/to/nyc_yellow_taxi.parquet'
-BQ_TABLE = 'your-project-id:lake_parquet.nyc_yellow_taxi_raw'
+BQ_TABLE = 'your-project-id:lake_parquet.nyc_yellow_taxi_cleaned'
 PROJECT_ID = 'your-project-id'
-REGION = 'your-region'  # e.g., us-central1
+REGION = 'your-region'
 STAGING_BUCKET = 'gs://your-bucket/staging'
 TEMP_BUCKET = 'gs://your-bucket/temp'
 
-# Updated BigQuery Schema
 BQ_SCHEMA = {
     'fields': [
         {'name': 'VendorID', 'type': 'INTEGER', 'mode': 'NULLABLE'},
@@ -47,12 +45,23 @@ class ReadParquetFromGCS(beam.DoFn):
                 for row in table.to_pylist():
                     yield row
 
+class FilterInvalidRows(beam.DoFn):
+    def process(self, row):
+        if any(value is None for value in row.values()):
+            return
+        if 'trip_distance' in row and row['trip_distance'] <= 0:
+            return
+        for value in row.values():
+            if isinstance(value, (int, float)) and value < 0:
+                return
+        yield row
+
 def run():
     options = PipelineOptions([
         f'--runner=DataflowRunner',
         f'--project={PROJECT_ID}',
         f'--region={REGION}',
-        f'--job_name=nyc-parquet-to-bq-datalake',
+        f'--job_name=nyc-parquet-to-bq-cleaned',
         f'--staging_location={STAGING_BUCKET}',
         f'--temp_location={TEMP_BUCKET}',
         '--save_main_session'
@@ -66,6 +75,7 @@ def run():
             p
             | 'Create GCS file path' >> beam.Create([GCS_FILE_PATH])
             | 'Read Parquet' >> beam.ParDo(ReadParquetFromGCS())
+            | 'Filter Invalid Rows' >> beam.ParDo(FilterInvalidRows())
             | 'Write to BigQuery' >> WriteToBigQuery(
                 table=BQ_TABLE,
                 schema=BQ_SCHEMA,
