@@ -5,16 +5,16 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 from apache_beam.io.filesystems import FileSystems
 
-PARQUET = 'gs://your-bucket/path/to/nyc_yellow_taxi.parquet'
-TABLA_BIGQUERY = 'your-project-id:lake_parquet.nyc_yellow_taxi_cleaned'
-PROJECT_ID = 'your-project-id'
+PARQUET = 'gs://nombre bucket/ubicacion .parquet>'
+TABLA_BIGQUERY = 'project id:nombre datre lake.nombre tabla a usar'
+PROJECT_ID = 'project id'
 REGION = 'us-central1'
-STAGING_BUCKET = 'gs://your-bucket/staging'
-TEMP_BUCKET = 'gs://your-bucket/temp'
+STAGING_BUCKET = 'gs://nombre bucket/staging'
+TEMP_BUCKET = 'gs://nombre bucket/temp'
 
 SCHEMA = {
     'fields': [
-        {'name': 'VendorID', 'type': 'STRING', 'mode': 'NULLABLE'},
+        {'name': 'VendorID', 'type': 'INTEGER', 'mode': 'NULLABLE'},
         {'name': 'tpep_pickup_datetime', 'type': 'TIMESTAMP', 'mode': 'NULLABLE'},
         {'name': 'tpep_dropoff_datetime', 'type': 'TIMESTAMP', 'mode': 'NULLABLE'},
         {'name': 'passenger_count', 'type': 'FLOAT', 'mode': 'NULLABLE'},
@@ -32,7 +32,8 @@ SCHEMA = {
         {'name': 'improvement_surcharge', 'type': 'FLOAT', 'mode': 'NULLABLE'},
         {'name': 'total_amount', 'type': 'FLOAT', 'mode': 'NULLABLE'},
         {'name': 'congestion_surcharge', 'type': 'FLOAT', 'mode': 'NULLABLE'},
-        {'name': 'Airport_fee', 'type': 'FLOAT', 'mode': 'NULLABLE'}
+        {'name': 'Airport_fee', 'type': 'FLOAT', 'mode': 'NULLABLE'},
+        {'name': 'VendorDesc', 'type': 'STRING', 'mode': 'NULLABLE'}
     ]
 }
 
@@ -56,7 +57,7 @@ class FiltrarFilas(beam.DoFn):
                 return
         yield row
 
-class MapearVendorID(beam.DoFn):
+class AgregarDescripcionVendorID(beam.DoFn):
     VENDOR_MAP = {
         1: "Creative Mobile Technologies, LLC",
         2: "Curb Mobility, LLC",
@@ -65,11 +66,8 @@ class MapearVendorID(beam.DoFn):
     }
 
     def process(self, row):
-        vendor_id = row.get('VendorID')
-        if vendor_id in self.VENDOR_MAP:
-            row['VendorID'] = self.VENDOR_MAP[vendor_id]
-        else:
-            row['VendorID'] = 'Unknown'
+        vendor_id = row.get("VendorID")
+        row["VendorDesc"] = self.VENDOR_MAP.get(vendor_id, "Desconocido")
         yield row
 
 def run():
@@ -89,11 +87,11 @@ def run():
     with beam.Pipeline(options=options) as p:
         (
             p
-            | 'Leer ruta de GCS' >> beam.Create([PARQUET])
-            | 'Leer Parquet desde GCS' >> beam.ParDo(LeerParquet())
-            | 'Filtrar filas inválidas' >> beam.ParDo(FiltrarFilas())
-            | 'Transformar VendorID a texto' >> beam.ParDo(MapearVendorID())
-            | 'Cargar a BigQuery' >> WriteToBigQuery(
+            | 'Create GCS file path' >> beam.Create([PARQUET])
+            | 'Leer Parquet' >> beam.ParDo(LeerParquet())
+            | 'Filtrar rows' >> beam.ParDo(FiltrarFilas())
+            | 'Agregar columna VendorDesc' >> beam.ParDo(AgregarDescripcionVendorID())
+            | 'Escribir a BigQuery' >> WriteToBigQuery(
                 table=TABLA_BIGQUERY,
                 schema=SCHEMA,
                 write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
