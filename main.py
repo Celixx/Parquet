@@ -5,7 +5,7 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 from apache_beam.io.filesystems import FileSystems
 
-PARQUET = 'gs://nombre bucket/ubicacion .parquet>'
+PARQUET = 'gs://nombre bucket/*.parquet'
 TABLA_BIGQUERY = 'project id:nombre datre lake.nombre tabla a usar'
 PROJECT_ID = 'project id'
 REGION = 'us-central1'
