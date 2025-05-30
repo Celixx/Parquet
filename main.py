@@ -1,9 +1,9 @@
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions
 from apache_beam.io.gcp.bigquery import WriteToBigQuery
+from apache_beam.io.filesystems import FileSystems
 import pyarrow.parquet as pq
 import pyarrow as pa
-from apache_beam.io.filesystems import FileSystems
 
 PARQUET = 'gs://nombre bucket/*.parquet'
 TABLA_BIGQUERY = 'project id:nombre datre lake.nombre tabla a usar'
@@ -71,6 +71,9 @@ class AgregarDescripcionVendorID(beam.DoFn):
         yield row
 
 def run():
+    matched_files = FileSystems.match([PARQUET])[0].metadata_list
+    file_paths = [f.path for f in matched_files]
+
     options = PipelineOptions([
         f'--runner=DataflowRunner',
         f'--project={PROJECT_ID}',
@@ -87,10 +90,10 @@ def run():
     with beam.Pipeline(options=options) as p:
         (
             p
-            | 'Create GCS file path' >> beam.Create([PARQUET])
+            | 'Lista de archivos Parquet' >> beam.Create(file_paths)
             | 'Leer Parquet' >> beam.ParDo(LeerParquet())
-            | 'Filtrar rows' >> beam.ParDo(FiltrarFilas())
-            | 'Agregar columna VendorDesc' >> beam.ParDo(AgregarDescripcionVendorID())
+            | 'Filtrar rows inválidas' >> beam.ParDo(FiltrarFilas())
+            | 'Agregar VendorDesc' >> beam.ParDo(AgregarDescripcionVendorID())
             | 'Escribir a BigQuery' >> WriteToBigQuery(
                 table=TABLA_BIGQUERY,
                 schema=SCHEMA,
